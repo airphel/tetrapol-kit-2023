@@ -49,6 +49,7 @@ channels.
 === demod/tetrapol_tx.grc
   GNURadio sketch for transmission of single TETRAPOL channel.
 
+https://github.com/airphel/tetrapol-kit-2023/wiki
 https://brmlab.cz/gitweb/?p=tetrapol-kit.git
 https://github.com/aeburriel/tetrapol-kit
 https://github.com/jenda122/tetrapol-kit
