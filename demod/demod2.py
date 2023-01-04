@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Usage:
 #
@@ -7,7 +7,7 @@
 
 import sys
 import math
-from gnuradio import gr, gru, eng_notation, blocks, filter, digital, analog
+from gnuradio import gr, eng_notation, blocks, filter, digital, analog, fft
 from gnuradio.eng_option import eng_option
 from optparse import OptionParser
 import osmosdr
@@ -22,13 +22,14 @@ class top_block(gr.top_block):
   def __init__(self):
     gr.top_block.__init__(self)
 
-    bitrate = 8000
+    symbolrate = 8000
     channel_bw = 12500
-    chan0_freq = 358400000
 
+    taps_ch = 16
 
     options = get_options()
 
+    chan0_freq = options.channel_0_freq
     self.rfgain = options.gain
 
     self.channels = [ int(ch) for ch in options.channels.split(',') if ch ]
@@ -39,14 +40,19 @@ class top_block(gr.top_block):
         self.channels.append(-1)
 
     if options.frequency is None:
-        self.ifreq = (max(self.ch_freqs) + min(self.ch_freqs)) / 2 / channel_bw * channel_bw
+        self.ifreq = (max(self.ch_freqs) + min(self.ch_freqs)) / 2 + 50000
+        if (min(self.channels) + max(self.channels)) % 2:
+            self.ifreq = self.ifreq - channel_bw / 2
     else:
         self.ifreq = options.frequency
 
+    sys.stderr.write("freq: %d\n" % (self.ifreq))
+
     ch0 = (self.ifreq - chan0_freq ) / channel_bw
     n = options.sample_rate / channel_bw
-    s = options.sample_rate / bitrate / 2
+    s = options.sample_rate / symbolrate / 2
     c = ''
+    ntap = options.sample_rate / channel_bw * taps_ch - 1 
     for ch in range(0,len(self.channels)):
         c = c + '%i,'%((self.channels[ch] - ch0)%n)
     c=c[:-1]
@@ -54,10 +60,11 @@ class top_block(gr.top_block):
     self.src = osmosdr.source(options.args)
     self.src.set_center_freq(self.ifreq)
     self.src.set_sample_rate(options.sample_rate)
+    self.src.set_bandwidth(options.sample_rate)
     self.src.set_freq_corr(options.ppm, 0)
 
-    fcl_args = ['./fcl', '-n', '%i'%n, '-s', '%i'%s, '-t', '2', '-c', '%s'%c, '-f', './fir.py %i 7900 2000 rcos'%options.sample_rate, '-o', '/dev/stdout']
-    sys.stderr.write(string.join(fcl_args))
+    fcl_args = ['./fcl', '-n', '%i'%n, '-s', '%i'%s, '-t', '2', '-c', '%s'%c, '-f', 'python3 ./fir.py %i 7900 %i rcos'%(options.sample_rate, ntap), '-o', '/dev/stdout']
+    sys.stderr.write(' '.join(fcl_args)+'\n')
     self.fcl = subprocess.Popen(fcl_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     self.fcl_in = blocks.file_descriptor_sink(gr.sizeof_gr_complex*1, self.fcl.stdin.fileno())
     self.fcl_out = blocks.file_descriptor_source(gr.sizeof_gr_complex*1, self.fcl.stdout.fileno(), False)
@@ -72,22 +79,27 @@ class top_block(gr.top_block):
         self.rfgain = 0
     else:
         self.iagc = 0
+        self.src.set_gain_mode(True)
         self.src.set_gain_mode(False)
-        self.src.set_gain(-9.7)
         self.src.set_gain(self.rfgain)
-        self.src.set_if_gain(37)
+#        self.src.set_gain(30,"LNA")
+#        self.src.set_gain(12,"TIA")
+#        self.src.set_gain(16,"PGA")
+#    self.src.set_antenna('LNAL')
+#    self.src.set_bandwidth(50000000)
+
 
     # may differ from the requested rate
     sample_rate = int(self.src.get_sample_rate())
     sys.stderr.write("sample rate: %d\n" % (sample_rate))
 
-    first_decim = int(options.sample_rate / bitrate / 2)
+    first_decim = int(options.sample_rate / symbolrate / 2)
     sys.stderr.write("decim: %d\n" % (first_decim))
 
     out_sample_rate=sample_rate/first_decim
     sys.stderr.write("output sample rate: %d\n" % (out_sample_rate))
 
-    sps=out_sample_rate/bitrate
+    sps=out_sample_rate/symbolrate
     sys.stderr.write("samples per symbol: %d\n" % (sps))
 
     self.tuners = []
@@ -103,9 +115,8 @@ class top_block(gr.top_block):
             raise ValueError('WTF')
     for ch in range(0,len(self.channels)):
         bw = (9200 + options.afc_ppm_threshold)/2
-        taps = filter.firdes.low_pass(1.0,out_sample_rate, bw, bw*options.transition_width, filter.firdes.WIN_HANN)
-#        offset = self.ch_freqs[ch] - self.ifreq
-        offset = 0
+        taps = filter.firdes.low_pass(1.0, out_sample_rate, bw, bw*options.transition_width, fft.window.WIN_HANN)
+        offset = self.ch_freqs[ch] - self.ifreq
         sys.stderr.write("channel[%d]: %d frequency=%d, offset=%d Hz\n" % (ch, self.channels[ch], self.ch_freqs[ch], offset))
 
 
@@ -176,15 +187,15 @@ def get_options():
     parser.add_option("-o", "--output-file", type="string", default="channel%%.bits", help="specify the bit output file")
     parser.add_option("-O", "--output-pipe", type="string", default=None, help="specify shell pipe to send output")
     parser.add_option("-l", "--channels-by-freq", type="string", default="", help="Receive on specified frequencies")
+    parser.add_option("-z", "--channel-0-freq", type="eng_float", default=358400000, help="Frequency of channel 0")
     (options, args) = parser.parse_args()
     if len(args) != 0:
         parser.print_help()
-        raise SystemExit, 1
+        raise SystemExit(1)
 
     return (options)
 
 if __name__ == '__main__':
         tb = top_block()
-#        tb.run(True)
         tb.start()
         tb.wait()

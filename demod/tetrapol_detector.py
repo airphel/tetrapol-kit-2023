@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # -*- encoding: UTF-8 -*-
 ##################################################
 # Gnuradio Python Flow Graph
@@ -138,7 +138,7 @@ class tetrapol_detector(gr.top_block):
         self._out.flush()
 
     def _emit_signals_stdout(self, signals):
-        print self._signals2str(signals)
+        print(self._signals2str(signals))
 
     def get_in_url(self):
         return self.in_url

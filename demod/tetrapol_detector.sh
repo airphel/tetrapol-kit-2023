@@ -31,7 +31,7 @@ if ! [ -d "${OUT_DIR}" ]; then
 fi
 
 echo "Detecting TETRAPOL channels"
-python2 tetrapol_detector.py \
+python3 tetrapol_detector.py \
     -f ${FREQ} \
     -B ${CH_BW} \
     -g ${GAIN} \
@@ -44,7 +44,7 @@ FREQS=`grep freq tmp/channels.json  | sed -e 's/.*freq": //' -e 's/\\..*//' | he
 
 echo "Receiving selected TETRAPOL channels"
 timeout ${TIMEOUT} \
-    python2 demod.py \
+    python3 demod.py \
         -g ${GAIN} \
         -s ${SAMP_RATE} \
         -B ${CH_BW} \

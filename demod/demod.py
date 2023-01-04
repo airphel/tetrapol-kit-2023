@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Usage:
 #
@@ -7,7 +7,7 @@
 
 import sys
 import math
-from gnuradio import gr, gru, eng_notation, blocks, filter, digital, analog
+from gnuradio import gr, eng_notation, blocks, filter, digital, analog, fft
 from gnuradio.eng_option import eng_option
 from optparse import OptionParser
 import osmosdr
@@ -51,9 +51,9 @@ class top_block(gr.top_block):
         self.rfgain = 0
     else:
         self.iagc = 0
+        self.src.set_gain_mode(True)
         self.src.set_gain_mode(False)
         self.src.set_gain(self.rfgain)
-        self.src.set_if_gain(37)
 
     # may differ from the requested rate
     sample_rate = int(self.src.get_sample_rate())
@@ -81,7 +81,7 @@ class top_block(gr.top_block):
             raise ValueError('WTF')
     for ch in range(0,len(self.channels)):
         bw = (9200 + options.afc_ppm_threshold)/2
-        taps = filter.firdes.low_pass(1.0, sample_rate, bw, bw*options.transition_width, filter.firdes.WIN_HANN)
+        taps = filter.firdes.low_pass(1.0, sample_rate, bw, bw*options.transition_width, fft.window.WIN_HANN)
         offset = self.ch_freqs[ch] - self.ifreq
         sys.stderr.write("channel[%d]: %d frequency=%d, offset=%d Hz\n" % (ch, self.channels[ch], self.ch_freqs[ch], offset))
 
@@ -157,7 +157,7 @@ def get_options():
     (options, args) = parser.parse_args()
     if len(args) != 0:
         parser.print_help()
-        raise SystemExit, 1
+        raise SystemExit(1)
 
     return (options)
 
