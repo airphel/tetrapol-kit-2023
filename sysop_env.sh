@@ -2,7 +2,7 @@
 # usage: . ./sysop_env.sh
 
 export GNURADIO_HOME=/home/tomash/x/gnuradio/run/
-export PYTHONPATH=$GNURADIO_HOME/lib/python2.7/dist-packages
+export PYTHONPATH=$GNURADIO_HOME/lib/python3/dist-packages
 export LD_LIBRARY_PATH=$GNURADIO_HOME/lib/
 export GR_SCHEDULER=STS
 
